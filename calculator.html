@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Calculator</title>
+  <style>
+    /* ----- minimal styling – clean and readable ----- */
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, sans-serif;
+    }
+    body {
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .calculator {
+      background: #1e1f26;
+      border-radius: 2rem;
+      padding: 1.8rem;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+    }
+    .display {
+      background: #0b0c0e;
+      border-radius: 1.2rem;
+      padding: 0.6rem 1.2rem;
+      text-align: right;
+      margin-bottom: 1.5rem;
+      min-height: 4.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .display .expression {
+      color: #8d95aa;
+      font-size: 0.9rem;
+      min-height: 1.4rem;
+    }
+    .display .result {
+      color: #f0f3fd;
+      font-size: 2.6rem;
+      font-weight: 500;
+      line-height: 1.2;
+      word-break: break-all;
+    }
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.7rem;
+    }
+    .btn {
+      background: #2d2f38;
+      border: none;
+      border-radius: 1.4rem;
+      padding: 0.9rem 0;
+      font-size: 1.6rem;
+      font-weight: 500;
+      color: #eaeef7;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #16171c;
+      transition: 0.06s linear;
+    }
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #16171c;
+    }
+    .btn.operator {
+      background: #f6a84c;
+      color: #1e1f26;
+      box-shadow: 0 4px 0 #b86f1f;
+    }
+    .btn.operator:active {
+      box-shadow: 0 1px 0 #b86f1f;
+    }
+    .btn.equal {
+      background: #4caf84;
+      color: #0b0c0e;
+      box-shadow: 0 4px 0 #2a6e54;
+    }
+    .btn.equal:active {
+      box-shadow: 0 1px 0 #2a6e54;
+    }
+    .btn.clear {
+      background: #d45c5c;
+      color: #fff;
+      box-shadow: 0 4px 0 #8f3a3a;
+    }
+    .btn.clear:active {
+      box-shadow: 0 1px 0 #8f3a3a;
+    }
+    .btn.zero {
+      grid-column: span 2;
+    }
+    .footer {
+      margin-top: 1rem;
+      text-align: center;
+      color: #7a8299;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="calculator">
+  <!-- Display area -->
+  <div class="display">
+    <div class="expression" id="expr"></div>
+    <div class="result" id="result">0</div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="buttons">
+    <button class="btn clear" data-action="clear">C</button>
+    <button class="btn operator" data-action="operator" data-value="/">÷</button>
+    <button class="btn operator" data-action="operator" data-value="*">×</button>
+    <button class="btn operator" data-action="operator" data-value="-">−</button>
+
+    <button class="btn" data-action="digit" data-value="7">7</button>
+    <button class="btn" data-action="digit" data-value="8">8</button>
+    <button class="btn" data-action="digit" data-value="9">9</button>
+    <button class="btn operator" data-action="operator" data-value="+">+</button>
+
+    <button class="btn" data-action="digit" data-value="4">4</button>
+    <button class="btn" data-action="digit" data-value="5">5</button>
+    <button class="btn" data-action="digit" data-value="6">6</button>
+    <button class="btn equal" data-action="equals">=</button>
+
+    <button class="btn" data-action="digit" data-value="1">1</button>
+    <button class="btn" data-action="digit" data-value="2">2</button>
+    <button class="btn" data-action="digit" data-value="3">3</button>
+    <button class="btn clear" data-action="clear" style="background:#5a5f73;box-shadow:0 4px 0 #3a3e4c;">⌫</button>
+
+    <button class="btn zero" data-action="digit" data-value="0">0</button>
+    <button class="btn" data-action="digit" data-value=".">.</button>
+  </div>
+  <div class="footer">+  −  ×  ÷</div>
+</div>
+
+<script>
+  // ----- STATE -----
+  let current = '0';       // number currently shown
+  let previous = '';       // left operand (as string)
+  let operator = null;     // '+', '-', '*', '/'
+  let resetNext = false;   // if true, next digit starts fresh
+
+  // DOM references
+  const resultEl = document.getElementById('result');
+  const exprEl = document.getElementById('expr');
+
+  // ----- UPDATE DISPLAY -----
+  function updateDisplay() {
+    // Show the current number (trim long decimals)
+    let display = current;
+    if (display.length > 14) {
+      display = parseFloat(display).toExponential(6);
+    }
+    resultEl.textContent = display;
+
+    // Show the pending operation, if any
+    if (operator && previous) {
+      const opSymbol = operator === '*' ? '×' : operator === '/' ? '÷' : operator;
+      exprEl.textContent = `${previous} ${opSymbol}`;
+    } else {
+      exprEl.textContent = '';
+    }
+  }
+
+  // ----- CORE OPERATIONS -----
+  function clearAll() {
+    current = '0';
+    previous = '';
+    operator = null;
+    resetNext = false;
+    updateDisplay();
+  }
+
+  function inputDigit(value) {
+    if (resetNext) {
+      // start a new number
+      current = value === '.' ? '0.' : value;
+      resetNext = false;
+      updateDisplay();
+      return;
+    }
+
+    // prevent multiple dots
+    if (value === '.' && current.includes('.')) return;
+
+    // avoid leading zeros (except "0.x")
+    if (current === '0' && value !== '.') {
+      current = value;
+    } else {
+      // limit length to avoid overflow
+      if (current.replace('-','').replace('.','').length >= 15) return;
+      current += value;
+    }
+    updateDisplay();
+  }
+
+  function handleOperator(op) {
+    const curNum = parseFloat(current);
+    if (isNaN(curNum)) return;
+
+    // If we already have an operator, compute first (chaining)
+    if (operator && !resetNext) {
+      const prevNum = parseFloat(previous);
+      const result = compute(prevNum, curNum, operator);
+      if (!isFinite(result)) {
+        clearAll();
+        resultEl.textContent = 'Error';
+        return;
+      }
+      current = String(result);
+      previous = current;
+      operator = op;
+      resetNext = true;
+      updateDisplay();
+      return;
+    }
+
+    // First operator or after clear
+    previous = current;
+    operator = op;
+    resetNext = true;
+    updateDisplay();
+  }
+
+  function handleEquals() {
+    if (!operator || !previous) {
+      // No operation pending – just clear the reset flag
+      resetNext = true;
+      return;
+    }
+
+    const a = parseFloat(previous);
+    const b = parseFloat(current);
+    if (isNaN(a) || isNaN(b)) {
+      clearAll();
+      resultEl.textContent = 'Error';
+      return;
+    }
+
+    const result = compute(a, b, operator);
+    if (!isFinite(result)) {
+      clearAll();
+      resultEl.textContent = 'Error';
+      return;
+    }
+
+    current = String(result);
+    previous = '';
+    operator = null;
+    resetNext = true;
+    exprEl.textContent = '';
+    updateDisplay();
+  }
+
+  function compute(a, b, op) {
+    switch (op) {
+      case '+': return a + b;
+      case '-': return a - b;
+      case '*': return a * b;
+      case '/': return b !== 0 ? a / b : Infinity;
+      default: return b;
+    }
+  }
+
+  // Backspace: remove last digit
+  function backspace() {
+    if (resetNext) return;          // nothing to delete
+    if (current.length > 1) {
+      current = current.slice(0, -1);
+    } else {
+      current = '0';
+    }
+    updateDisplay();
+  }
+
+  // ----- EVENT HANDLING (click) -----
+  document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+
+      if (action === 'digit') {
+        inputDigit(btn.dataset.value);
+      } else if (action === 'operator') {
+        handleOperator(btn.dataset.value);
+      } else if (action === 'equals') {
+        handleEquals();
+      } else if (action === 'clear') {
+        clearAll();
+      } else if (action === 'backspace') {
+        backspace();
+      }
+    });
+  });
+
+  // ----- KEYBOARD SUPPORT (optional, but makes it friendlier) -----
+  document.addEventListener('keydown', (e) => {
+    const key = e.key;
+    if (key >= '0' && key <= '9') {
+      e.preventDefault();
+      inputDigit(key);
+    } else if (key === '.') {
+      e.preventDefault();
+      inputDigit('.');
+    } else if (key === '+') {
+      e.preventDefault();
+      handleOperator('+');
+    } else if (key === '-') {
+      e.preventDefault();
+      handleOperator('-');
+    } else if (key === '*') {
+      e.preventDefault();
+      handleOperator('*');
+    } else if (key === '/') {
+      e.preventDefault();
+      handleOperator('/');
+    } else if (key === 'Enter' || key === '=') {
+      e.preventDefault();
+      handleEquals();
+    } else if (key === 'Backspace') {
+      e.preventDefault();
+      backspace();
+    } else if (key === 'Escape' || key === 'c' || key === 'C') {
+      e.preventDefault();
+      clearAll();
+    }
+  });
+
+  // Initial display
+  clearAll();
+</script>
+</body>
+</html>
